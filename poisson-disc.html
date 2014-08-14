@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<body>
+<script src="http://d3js.org/d3.v3.min.js"></script>
+<script src="data.js"></script>
+<script>
+
+var width = 640,
+    height = 800,
+    photoW = 200,
+    photoH = 300,
+    count = 0,
+    sample = poissonDiscSampler(width, height, photoW*0.8);//FIXME
+
+var svg = d3.select("body").append("svg")
+    .attr("width", width)
+    .attr("height", height);
+
+var len = 10;
+while(len > 0) {
+  var s = sample();
+  if (!s) break;
+  len--;
+  var x = s[0],
+      y = s[1],
+      cx = x - (photoW/2),
+      cy = y - (photoH/2),
+      angle = (Math.random() * 20) - 10; // +- 10 deg
+  var imageUrl = json.collages.data[count++%json.collages.data.length].image_medium;
+  svg.append("svg:image")
+      .attr('x', cx)
+      .attr('y', cy)
+      .attr('width', photoW)
+      .attr('height', photoH)
+      .attr("transform", "rotate("+ angle +" " +cx+ " " +cy+ ")")
+      .attr("xlink:href", imageUrl);
+}
+
+// Based on https://www.jasondavies.com/poisson-disc/
+function poissonDiscSampler(width, height, radius) {
+  var k = 30, // maximum number of samples before rejection
+      radius2 = radius * radius,
+      R = 3 * radius2,
+      cellSize = radius * Math.SQRT1_2,
+      gridWidth = Math.ceil(width / cellSize),
+      gridHeight = Math.ceil(height / cellSize),
+      grid = new Array(gridWidth * gridHeight),
+      queue = [],
+      queueSize = 0,
+      sampleSize = 0;
+
+  return function() {
+    if (!sampleSize) return sample(Math.random() * width, Math.random() * height);
+    //if (!sampleSize) return sample((Math.random()*30)+(width/2),(Math.random()*30)+(height/2)); // center first
+
+    // Pick a random existing sample and remove it from the queue.
+    while (queueSize) {
+      var i = Math.random() * queueSize | 0,
+          s = queue[i];      
+      var p = cal(s);
+      if (p)
+        return p;
+      queue[i] = queue[--queueSize];
+      queue.length = queueSize;
+    }
+  };
+
+  // Make a new candidate between [radius, 2 * radius] from the existing sample.
+  function cal(s) {
+    for (var j = 0; j < k; ++j) {
+        var a = 2 * Math.PI * Math.random(),
+            r = Math.sqrt(Math.random() * R + radius2),
+            x = s[0] + r * Math.cos(a),
+            y = s[1] + r * Math.sin(a);
+
+        // Reject candidates that are outside the allowed extent,
+        // or closer than 2 * radius to any existing sample.
+        if (0 <= x && x < width && 0 <= y && y < height && far(x, y)) return sample(x, y);
+    }
+    return null;
+  }
+
+  function far(x, y) {
+    var i = x / cellSize | 0,
+        j = y / cellSize | 0,
+        i0 = Math.max(i - 2, 0),
+        j0 = Math.max(j - 2, 0),
+        i1 = Math.min(i + 3, gridWidth),
+        j1 = Math.min(j + 3, gridHeight);
+
+    for (j = j0; j < j1; ++j) {
+      var o = j * gridWidth;
+      for (i = i0; i < i1; ++i) {
+        if (s = grid[o + i]) {
+          var s,
+              dx = s[0] - x,
+              dy = s[1] - y;
+          if (dx * dx + dy * dy < radius2) return false;
+        }
+      }
+    }
+
+    return true;
+  }
+
+  function sample(x, y) {
+    var s = [x, y];
+    queue.push(s);
+    grid[gridWidth * (y / cellSize | 0) + (x / cellSize | 0)] = s;
+    ++sampleSize;
+    ++queueSize;
+    return s;
+  }
+}
+
+</script>
